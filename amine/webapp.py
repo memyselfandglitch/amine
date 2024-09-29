@@ -8,10 +8,12 @@ import keyboard
 import time
 import sys
 import pygetwindow as gw
-import winsound
+from playsound import playsound
+import os
 #from win11toast import toast
 
 app = Flask(__name__)
+audio = os.path.join(os.getcwd(), 'beep.wav')
 
 CONFIG = {
     "SAFE_X": 500,
@@ -157,19 +159,19 @@ def pomodoro_flow(pomodoros, focus_duration, break_duration, website):
     pyautogui.press('f11')  
 
     focus_protection = FocusProtection()
-    #winsound.Beep(500,500)
+    #winsound(500,500)
     for i in range(pomodoros):
-        winsound.Beep(500,500)
+        playsound(audio)
         print(f"Starting Pomodoro {i + 1}/{pomodoros}")
         focus_protection.start_protection(focus_duration)
 
         if i < pomodoros - 1:
-            winsound.Beep(500,500)
+            playsound(audio)
             print(f"Break: {break_duration} minutes")
             time.sleep(break_duration * 60)
 
     print("Pomodoro session completed. Exiting fullscreen...")
-    winsound.Beep(1000,500)
+    playsound(audio)
     pyautogui.press('f11')  # Exit fullscreen
     maximize_flask_window()
     print("Flask window restored.")
