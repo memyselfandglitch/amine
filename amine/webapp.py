@@ -10,6 +10,7 @@ import sys
 import pygetwindow as gw
 from playsound import playsound
 import os
+import subprocess
 #from win11toast import toast
 
 app = Flask(__name__)
@@ -33,15 +34,18 @@ class FocusProtection:
         pyautogui.FAILSAFE = False
         self.protection_active = False
         self.mouse_thread = None
+        print("init")
         #self.quit_early = False  # Flag to track early quit
 
     def enforce_mouse_boundaries(self):
+        print(pyautogui.size())
         screen_width, screen_height = pyautogui.size()
         while self.protection_active:
             x, y = pyautogui.position()
             if (y < self.config["TOP_SCREEN_THRESHOLD"] or y > screen_height - self.config["TOP_SCREEN_THRESHOLD"]):
                 pyautogui.moveTo(self.config["SAFE_X"], self.config["SAFE_Y"])
             time.sleep(self.config["MOUSE_ENFORCE_DELAY"])
+        print("boundaries")
 
     def block_keys(self):
         for key in self.config["BLOCKED_KEYS"]:
@@ -60,6 +64,7 @@ class FocusProtection:
         self.protection_active = True
         self.mouse_thread = threading.Thread(target=self.enforce_mouse_boundaries, daemon=True)
         self.mouse_thread.start()
+        print("block distractions")
 
         try:
             while datetime.now() < end_time:
@@ -75,25 +80,72 @@ class FocusProtection:
         self.block_distractions(duration_minutes)
 
 def minimize_flask_window():
-    print("Minimizing Flask window...")
-    windows = gw.getWindowsWithTitle("amine")  
-    if windows:
-        flask_window = windows[0]
-        flask_window.minimize()
-        print("Flask window minimized.")
-    else:
-        print("Flask window not found.")
+    if(sys.platform=="win32"):
+        print("Minimizing Flask window...")
+        windows = gw.getWindowsWithTitle("amine")  
+        if windows:
+            flask_window = windows[0]
+            flask_window.minimize()
+            print("Flask window minimized.")
+        else:
+            print("Flask window not found.")
+    elif(sys.platform=="Darwin"):
+        script = '''
+        tell application "System Events"
+            repeat with proc in (every process whose visible is true)
+                try
+                    if (name of first window of proc) contains "amine" then
+                        set visible of proc to false
+                        exit repeat
+                    end if
+                end try
+            end repeat
+        end tell
+        '''
+
+        subprocess.run(["osascript", "-e", script])
 
 def maximize_flask_window():
-    print("Maximizing Flask window...")
-    windows = gw.getWindowsWithTitle("amine")  
-    if windows:
-        flask_window = windows[0]
-        flask_window.maximize()
-        print("Flask window maximized.")
-    else:
-        print("Flask window not found.")
+    if sys.platform == "win32":
+        print("Maximizing Flask window...")
+        windows = gw.getWindowsWithTitle("amine")
+        if windows:
+            flask_window = windows[0]
+            flask_window.maximize()
+            print("Flask window maximized.")
+        else:
+            print("Flask window not found.")
+    elif sys.platform == "Darwin":  # macOS
+        script = '''
+        tell application "System Events"
+            repeat with proc in (every process whose visible is false)
+                try
+                    if (name of first window of proc) contains "amine" then
+                        set visible of proc to true
+                        set frontmost of proc to true
+                        exit repeat
+                    end if
+                end try
+            end repeat
+        end tell
+        '''
+        subprocess.run(["osascript", "-e", script])
 
+def toggle_fullscreen():
+    if sys.platform == "win32":
+        print("Toggling fullscreen on Windows...")
+        pyautogui.press('f11')
+    elif sys.platform == "darwin":  # macOS
+        print("Toggling fullscreen on macOS...")
+        script = '''
+        tell application "System Events"
+            keystroke "f" using {control down, command down}  -- Standard MacOS fullscreen shortcut
+        end tell
+        '''
+        subprocess.run(["osascript", "-e", script])
+    elif sys.platform == "linux" or sys.platform == "linux2":  # Linux
+        print("Toggling fullscreen on Linux...")
+        pyautogui.press('f11')  # Works the same as on Windows for most desktop environments
 
 """
 def get_browser_window():
@@ -152,12 +204,12 @@ def pomodoro_flow(pomodoros, focus_duration, break_duration, website):
     webbrowser.open(website)
     minimize_flask_window()
     time.sleep(5) # Adjust timing as necessary
-    pyautogui.click(x=100, y=200)  
+    # pyautogui.click(x=100, y=200)  
     # this is some kind of jugad i presume
     # ensure_fullscreen()  # This implementation failed. It Ensured the window is fullscreen
     
-    pyautogui.press('f11')  
-
+    toggle_fullscreen() 
+    print("about to start")
     focus_protection = FocusProtection()
     #winsound(500,500)
     for i in range(pomodoros):
@@ -172,7 +224,7 @@ def pomodoro_flow(pomodoros, focus_duration, break_duration, website):
 
     print("Pomodoro session completed. Exiting fullscreen...")
     playsound(audio)
-    pyautogui.press('f11')  # Exit fullscreen
+    toggle_fullscreen()  # Exit fullscreen
     maximize_flask_window()
     print("Flask window restored.")
 
