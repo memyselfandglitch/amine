@@ -8,7 +8,6 @@ import keyboard
 import time
 import sys
 import pygetwindow as gw
-from playsound import playsound
 import os
 import subprocess
 #from win11toast import toast
@@ -20,13 +19,20 @@ CONFIG = {
     "SAFE_X": 500,
     "SAFE_Y": 500,
     "TOP_SCREEN_THRESHOLD": 40,
-    "BLOCKED_KEYS": [
-        'left windows', 'right windows', 'alt', 'tab', 'ctrl', 'esc', 
-        'f11', 'cmd', 'command', 'win'
-    ],
-    "EXIT_COMBO": 'ctrl+shift+q',
     "MOUSE_ENFORCE_DELAY": 0.08  # Configurable delay for mouse boundary enforcement
 }
+if sys.platform == "darwin":  # macOS
+    CONFIG["BLOCKED_KEYS"] = ['cmd', 'option', 'tab', 'ctrl', 'esc', 'f11']
+elif sys.platform == "win32":
+    CONFIG["BLOCKED_KEYS"] = ['left windows', 'right windows', 'alt', 'tab', 'ctrl', 'esc', 'f11', 'win']
+
+if sys.platform == "darwin":  # macOS
+    CONFIG["EXIT_COMBO"] = 'command+q'  # Update to macOS-friendly keys
+elif sys.platform == "win32":
+    CONFIG["EXIT_COMBO"] = 'ctrl+q'  # Windows-friendly keys
+
+if(sys.platform == "win32"):
+    import winsound
 
 class FocusProtection:
     def __init__(self, config=CONFIG):
@@ -34,19 +40,15 @@ class FocusProtection:
         pyautogui.FAILSAFE = False
         self.protection_active = False
         self.mouse_thread = None
-        print("init")
         #self.quit_early = False  # Flag to track early quit
 
     def enforce_mouse_boundaries(self):
-        print(pyautogui.size())
-        screen_width, screen_height = pyautogui.size()
         while self.protection_active:
             x, y = pyautogui.position()
             if (y < self.config["TOP_SCREEN_THRESHOLD"] or y > screen_height - self.config["TOP_SCREEN_THRESHOLD"]):
                 pyautogui.moveTo(self.config["SAFE_X"], self.config["SAFE_Y"])
             time.sleep(self.config["MOUSE_ENFORCE_DELAY"])
-        print("boundaries")
-
+        
     def block_keys(self):
         for key in self.config["BLOCKED_KEYS"]:
             keyboard.block_key(key)
@@ -64,7 +66,6 @@ class FocusProtection:
         self.protection_active = True
         self.mouse_thread = threading.Thread(target=self.enforce_mouse_boundaries, daemon=True)
         self.mouse_thread.start()
-        print("block distractions")
 
         try:
             while datetime.now() < end_time:
@@ -81,7 +82,6 @@ class FocusProtection:
 
 def minimize_flask_window():
     if(sys.platform=="win32"):
-        print("Minimizing Flask window...")
         windows = gw.getWindowsWithTitle("amine")  
         if windows:
             flask_window = windows[0]
@@ -130,6 +130,12 @@ def maximize_flask_window():
         end tell
         '''
         subprocess.run(["osascript", "-e", script])
+
+def play_sound(audio_path):
+    if sys.platform == 'darwin':  # macOS
+        subprocess.run(["afplay", audio_path])  # macOS's built-in audio player
+    else:
+        winsound.Beep(500,500)  # Fallback to play_sound for other OSes
 
 def toggle_fullscreen():
     if sys.platform == "win32":
@@ -213,17 +219,17 @@ def pomodoro_flow(pomodoros, focus_duration, break_duration, website):
     focus_protection = FocusProtection()
     #winsound(500,500)
     for i in range(pomodoros):
-        playsound(audio)
+        play_sound(audio)
         print(f"Starting Pomodoro {i + 1}/{pomodoros}")
         focus_protection.start_protection(focus_duration)
 
         if i < pomodoros - 1:
-            playsound(audio)
+            play_sound(audio)
             print(f"Break: {break_duration} minutes")
             time.sleep(break_duration * 60)
 
     print("Pomodoro session completed. Exiting fullscreen...")
-    playsound(audio)
+    play_sound(audio)
     toggle_fullscreen()  # Exit fullscreen
     maximize_flask_window()
     print("Flask window restored.")
